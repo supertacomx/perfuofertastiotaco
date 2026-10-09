@@ -25,9 +25,9 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate modern Android scaffold (v2 embedding)
+      - name: Generate modern Android scaffold
         run: |
-          flutter create --platforms=android --org com.example.perfume_tracker .
+          flutter create --platforms=android --org com.perfumetracker.app .
 
       - name: Configure Android Manifest (Internet & UrlLauncher)
         run: |
