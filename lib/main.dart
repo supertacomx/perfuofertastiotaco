@@ -14,10 +14,11 @@ class PerfumeTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Perfume Tracker',
+      title: 'Perfume Tracker MX',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF101014),
+        cardColor: const Color(0xFF1E1E24),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF90CAF9),
           surface: Color(0xFF1E1E24),
@@ -95,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _searchPerfume() async {
     if (_apiKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Configura tu API Key en el icono de arriba a la derecha.')),
+        const SnackBar(content: Text('Configura tu API Key en el icono de llave.')),
       );
       _showApiKeyDialog();
       return;
@@ -120,7 +121,7 @@ Tiendas autorizadas a consultar:
 Obtén notas olfativas de Fragrantica.
 Devuelve EXCLUSIVAMENTE este JSON:
 {
-  "perfume": "Nombre y presentación",
+  "perfume": "Nombre oficial y presentación",
   "precios": [
     {"tienda": "Tienda", "precio": "\$000.00 MXN", "url": "https://enlace-directo"}
   ],
@@ -137,7 +138,7 @@ Devuelve EXCLUSIVAMENTE este JSON:
 
     try {
       final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\$_apiKey',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + _apiKey,
       );
 
       final response = await http.post(
@@ -169,12 +170,12 @@ Devuelve EXCLUSIVAMENTE este JSON:
         });
       } else {
         setState(() {
-          _error = 'Error de conexión: \${response.statusCode}';
+          _error = 'Error de respuesta del servidor: ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
-        _error = 'Error al procesar: \$e';
+        _error = 'Error al consultar: $e';
       });
     } finally {
       setState(() {
@@ -191,8 +192,47 @@ Devuelve EXCLUSIVAMENTE este JSON:
     }
   }
 
+  Widget _buildFichaCard(Map<String, dynamic> ficha) {
+    final salidaList = (ficha['salida'] as List? ?? []).map((e) => e.toString()).toList();
+    final corazonList = (ficha['corazon'] as List? ?? []).map((e) => e.toString()).toList();
+    final fondoList = (ficha['fondo'] as List? ?? []).map((e) => e.toString()).toList();
+    final longevidad = ficha['longevidad']?.toString() ?? 'N/A';
+    final proyeccion = ficha['proyeccion']?.toString() ?? 'N/A';
+    final resena = ficha['resena']?.toString() ?? '';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Salida: ' + salidaList.join(', ')),
+            const SizedBox(height: 4),
+            Text('Corazón: ' + corazonList.join(', ')),
+            const SizedBox(height: 4),
+            Text('Fondo: ' + fondoList.join(', ')),
+            const Divider(height: 20),
+            Text('Longevidad: ' + longevidad),
+            Text('Proyección: ' + proyeccion),
+            if (resena.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                resena,
+                style: const TextStyle(fontStyle: FontStyle.italic),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final perfumeName = _data?['perfume']?.toString() ?? '';
+    final preciosList = (_data?['precios'] as List? ?? []);
+    final fichaMap = _data?['ficha'] as Map<String, dynamic>?;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Perfume Tracker MX'),
@@ -248,14 +288,16 @@ Devuelve EXCLUSIVAMENTE este JSON:
               ),
             if (_error != null)
               Expanded(
-                child: Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent))),
+                child: Center(
+                  child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                ),
               ),
             if (_data != null)
               Expanded(
                 child: ListView(
                   children: [
                     Text(
-                      _data!['perfume'] ?? '',
+                      perfumeName,
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
@@ -264,49 +306,35 @@ Devuelve EXCLUSIVAMENTE este JSON:
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
                     ),
                     const SizedBox(height: 8),
-                    ...((_data!['precios'] as List? ?? []).map((item) {
+                    ...preciosList.map((item) {
+                      final mapItem = item as Map<String, dynamic>;
+                      final tienda = mapItem['tienda']?.toString() ?? '';
+                      final precio = mapItem['precio']?.toString() ?? '';
+                      final url = mapItem['url']?.toString() ?? '';
+
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          title: Text(item['tienda'] ?? ''),
+                          title: Text(tienda),
                           trailing: Text(
-                            item['precio'] ?? '',
-                            style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                            precio,
+                            style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
-                          onTap: () => _openUrl(item['url']),
+                          onTap: () => _openUrl(url),
                         ),
                       );
-                    })),
+                    }),
                     const SizedBox(height: 16),
                     const Text(
                       'Ficha Técnica (Fragrantica)',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
                     ),
                     const SizedBox(height: 8),
-                    if (_data!['ficha'] != null)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Salida: \${(_data!['ficha']['salida'] as List? ?? []).join(", ")}'),
-                              const SizedBox(height: 4),
-                              Text('Corazón: \${(_data!['ficha']['corazon'] as List? ?? []).join(", ")}'),
-                              const SizedBox(height: 4),
-                              Text('Fondo: \${(_data!['ficha']['fondo'] as List? ?? []).join(", ")}'),
-                              const Divider(height: 20),
-                              Text('Longevidad: \${_data!['ficha']['longevidad'] ?? "N/A"}'),
-                              Text('Proyección: \${_data!['ficha']['proyeccion'] ?? "N/A"}'),
-                              const SizedBox(height: 8),
-                              Text(
-                                _data!['ficha']['resena'] ?? '',
-                                style: const TextStyle(fontStyle: FontStyle.italic),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    if (fichaMap != null) _buildFichaCard(fichaMap),
                   ],
                 ),
               ),
